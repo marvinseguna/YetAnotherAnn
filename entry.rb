@@ -1,4 +1,5 @@
 require 'matrix'
+require 'chunky_png'
 
 XOR             = ->(a,b) {a^b}
 SIGMOID         = ->(a) {1/(1+Math.exp(-a))}
@@ -16,6 +17,21 @@ $ho_weights = Array.new(1) {Array.new(4,rand)} # 4 hidden * 1 output - Not a mat
 $i_nodes = [999,999,1] # 1 here is the Bias
 $h_nodes = [999,999,999,1] # 1 here is the Bias
 $o_nodes = [0]
+
+# This is not needed. It was implemented as a validator to see that images are read correctly
+def convert_to_images(arr,rows,cols)
+    canvas = ChunkyPNG::Canvas.new(28, 28, ChunkyPNG::Color::TRANSPARENT)
+    canvas.grayscale!
+    
+    for i in 0..arr.length-1 do
+        for j in 0..rows-1 do
+            for k in 0..cols-1 do
+                canvas[j,k] = arr[i][((cols+1)*j)+k]
+            end
+        end
+        canvas.save("F:\\Projects\\YetAnotherAnn\\filename#{i}.png", :interlace => true)
+    end
+end
 
 def feed_forward
     # compute the hidden node values
@@ -84,30 +100,40 @@ def train(input1, input2, expected)
     ########################################################
 end
 
+def read_mnist_file_images(path)
+    file = File.open(path, "rb") # opens file in binary format
 
-for i in 0..400000 do
-    train(0, 0, [0])
-    train(0, 1, [1])
-    train(1, 0, [1])
-    train(1, 1, [0])
+    # first 16 bytes are 32-bit integer in Big Endian format
+    magic = ((file.read 4).unpack 'N' * 4).first    
+    amount = ((file.read 4).unpack 'N' * 4).first
+    rows = ((file.read 4).unpack 'N' * 4).first
+    cols = ((file.read 4).unpack 'N' * 4).first
+
+    arr = []
+    for i in 0..3 do #amount-1 do
+        tmp_arr = []
+        for j in 0..rows-1 do
+            for k in 0..cols-1 do
+                tmp_arr[((cols+1)*j)+k] = ((file.read 1).unpack 'C' * 1).first
+            end
+        end
+        arr[i] = tmp_arr
+    end
+    convert_to_images arr,28,28
+    arr
 end
 
-$i_nodes[0] = 0
-$i_nodes[1] = 0
-feed_forward
-puts "Xor(0,0): Expected #{XOR.call 0,0}, Computed: #{$o_nodes[0]}"
-#
-$i_nodes[0] = 0
-$i_nodes[1] = 1
-feed_forward
-puts "Xor(0,1): Expected #{XOR.call 0,1}, Computed: #{$o_nodes[0]}"
-#
-$i_nodes[0] = 1
-$i_nodes[1] = 0
-feed_forward
-puts "Xor(1,0): Expected #{XOR.call 1,0}, Computed: #{$o_nodes[0]}"
-#
-$i_nodes[0] = 1
-$i_nodes[1] = 1
-feed_forward
-puts "Xor(1,1): Expected #{XOR.call 1,1}, Computed: #{$o_nodes[0]}"
+def read_mnist_file_labels(path)
+    file = File.open(path, "rb") # opens file in binary format
+    magic = ((file.read 4).unpack 'N' * 4).first    
+    amount = ((file.read 4).unpack 'N' * 4).first
+
+    arr = []
+    for i in 0..3 do #amount-1 do
+        arr[i] = ((file.read 1).unpack 'C' * 1).first
+    end
+    arr
+end
+
+images = read_mnist_file_images "#{__dir__}\\data\\train-images.idx3-ubyte"
+labels = read_mnist_file_labels "#{__dir__}\\data\\train-labels.idx1-ubyte"
